@@ -1,0 +1,22 @@
+# Python cache
+
+**pycache**/
+*.pyc
+
+# Virtual environment
+
+venv/
+.venv/
+
+# Model checkpoints (DO NOT PUSH)
+
+*.pth
+
+# Dataset (local only)
+
+data/
+
+# OS / editor files
+
+.DS_Store
+.vscode/
