@@ -12,10 +12,6 @@ venv/
 
 *.pth
 
-# Dataset (local only)
-
-data/
-
 # OS / editor files
 
 .DS_Store
