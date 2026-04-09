@@ -46,33 +46,42 @@ class OxfordPetsDataset(Dataset):
         mask = mask.resize((224, 224))
         mask = torch.tensor(np.array(mask)).long()
 
+        # FIX: make labels 0-based
+        mask = mask - 1
+
         # ---- Bounding box ----
         xml_path = os.path.join(self.xml_dir, name + ".xml")
-        tree = ET.parse(xml_path)
-        root_xml = tree.getroot()
 
-        obj = root_xml.find("object")
-        bndbox = obj.find("bndbox")
+        if os.path.exists(xml_path):
+            tree = ET.parse(xml_path)
+            root_xml = tree.getroot()
 
-        xmin = float(bndbox.find("xmin").text)
-        ymin = float(bndbox.find("ymin").text)
-        xmax = float(bndbox.find("xmax").text)
-        ymax = float(bndbox.find("ymax").text)
+            obj = root_xml.find("object")
+            bndbox = obj.find("bndbox")
 
-        x_center = (xmin + xmax) / 2
-        y_center = (ymin + ymax) / 2
-        width = xmax - xmin
-        height = ymax - ymin
+            xmin = float(bndbox.find("xmin").text)
+            ymin = float(bndbox.find("ymin").text)
+            xmax = float(bndbox.find("xmax").text)
+            ymax = float(bndbox.find("ymax").text)
 
-        x_scale = 224 / orig_w
-        y_scale = 224 / orig_h
+            x_center = (xmin + xmax) / 2
+            y_center = (ymin + ymax) / 2
+            width = xmax - xmin
+            height = ymax - ymin
 
-        bbox = torch.tensor([
-            x_center * x_scale,
-            y_center * y_scale,
-            width * x_scale,
-            height * y_scale,
-        ], dtype=torch.float32)
+            x_scale = 224 / orig_w
+            y_scale = 224 / orig_h
+
+            bbox = torch.tensor([
+                x_center * x_scale,
+                y_center * y_scale,
+                width * x_scale,
+                height * y_scale,
+            ], dtype=torch.float32)
+        else:
+            # fallback: full image box
+            bbox = torch.tensor([112.0, 112.0, 224.0, 224.0], dtype=torch.float32)
+        
 
         return {
             "image": image,
