@@ -18,3 +18,5 @@ venv/
 .vscode/
 
 wandb/
+
+data/
