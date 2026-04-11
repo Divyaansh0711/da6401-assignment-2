@@ -28,10 +28,26 @@ def get_loaders():
     return train_loader, val_loader
 
 
+# ---------------------- CLASSIFIER ----------------------
 def train_classifier():
-    wandb.init(project="da6401", name="classifier")
+    dropout_p = 0.2
+    use_batchnorm = False
 
-    model = VGG11Classifier().to(DEVICE)
+    wandb.init(
+        project="da6401",
+        name="classifier_bn_false",
+        config={
+            "task": "classification",
+            "lr": LR,
+            "epochs": EPOCHS,
+            "batch_size": BATCH_SIZE,
+            "dropout": dropout_p
+        }
+    )
+
+    # model = VGG11Classifier().to(DEVICE)
+    
+    model = VGG11Classifier(dropout_p=dropout_p,use_batchnorm=use_batchnorm).to(DEVICE)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=LR)
 
@@ -40,6 +56,8 @@ def train_classifier():
     for epoch in range(EPOCHS):
         model.train()
         train_loss = 0
+        correct = 0
+        total = 0
 
         for i, batch in enumerate(train_loader):
             imgs = batch["image"].to(DEVICE)
@@ -53,14 +71,18 @@ def train_classifier():
 
             train_loss += loss.item()
 
+            preds = outputs.argmax(dim=1)
+            correct += (preds == labels).sum().item()
+            total += labels.size(0)
+
             if i % 50 == 0:
                 print(f"[Classifier][Epoch {epoch+1}] Batch {i}/{len(train_loader)} Loss: {loss.item():.4f}")
 
         # Validation
         model.eval()
         val_loss = 0
-        correct = 0
-        total = 0
+        val_correct = 0
+        val_total = 0
 
         with torch.no_grad():
             for batch in val_loader:
@@ -73,27 +95,41 @@ def train_classifier():
                 val_loss += loss.item()
 
                 preds = outputs.argmax(dim=1)
-                correct += (preds == labels).sum().item()
-                total += labels.size(0)
+                val_correct += (preds == labels).sum().item()
+                val_total += labels.size(0)
 
         train_loss /= len(train_loader)
         val_loss /= len(val_loader)
-        acc = correct / total
 
-        print(f"[Classifier] Epoch {epoch+1} Train Loss: {train_loss:.4f} Val Loss: {val_loss:.4f} Acc: {acc:.4f}")
+        train_acc = correct / total
+        val_acc = val_correct / val_total
+
+        print(f"[Classifier] Epoch {epoch+1} Train Loss: {train_loss:.4f} Val Loss: {val_loss:.4f} Train Acc: {train_acc:.4f} Val Acc: {val_acc:.4f}")
 
         wandb.log({
-            "train_loss": train_loss,
-            "val_loss": val_loss,
-            "accuracy": acc
+            "train/loss": train_loss,
+            "val/loss": val_loss,
+            "train/accuracy": train_acc,
+            "val/accuracy": val_acc
         })
 
-    torch.save(model.state_dict(), "classifier.pth")
+    torch.save(model.state_dict(), f"classifier_bn_{use_batchnorm}.pth")
     wandb.finish()
 
 
+# ---------------------- LOCALIZER ----------------------
 def train_localizer():
-    wandb.init(project="da6401", name="localizer")
+    wandb.init(
+        project="da6401",
+        name="localizer_base",
+        config={
+            "task": "localization",
+            "lr": LR,
+            "epochs": EPOCHS,
+            "batch_size": BATCH_SIZE,
+            "loss": "MSE + IoU"
+        }
+    )
 
     model = VGG11Localizer().to(DEVICE)
     criterion_mse = nn.MSELoss()
@@ -142,20 +178,64 @@ def train_localizer():
         print(f"[Localizer] Epoch {epoch+1} Train Loss: {train_loss:.4f} Val Loss: {val_loss:.4f}")
 
         wandb.log({
-            "train_loss": train_loss,
-            "val_loss": val_loss
+            "train/loss": train_loss,
+            "val/loss": val_loss
         })
 
     torch.save(model.state_dict(), "localizer.pth")
     wandb.finish()
 
 
+# ---------------------- SEGMENTER ----------------------
 def train_segmenter():
-    wandb.init(project="da6401", name="segmenter")
+    transfer_mode = "strict"   # choose from: "strict", "partial", "full"
+
+    wandb.init(
+        project="da6401",
+        name=f"segmenter_{transfer_mode}",
+        config={
+            "task": "segmentation",
+            "transfer_mode": transfer_mode,
+            "lr": LR,
+            "epochs": EPOCHS,
+            "batch_size": BATCH_SIZE,
+            "loss": "CrossEntropy"
+        }
+    )
 
     model = VGG11UNet().to(DEVICE)
+
+    # -------------------- Transfer learning setup --------------------
+    if transfer_mode == "strict":
+        for param in model.encoder.parameters():
+            param.requires_grad = False
+
+    elif transfer_mode == "partial":
+        # Freeze early blocks, fine-tune later ones
+        for param in model.encoder.block1.parameters():
+            param.requires_grad = False
+        for param in model.encoder.block2.parameters():
+            param.requires_grad = False
+        for param in model.encoder.block3.parameters():
+            param.requires_grad = False
+
+        for param in model.encoder.block4.parameters():
+            param.requires_grad = True
+        for param in model.encoder.block5.parameters():
+            param.requires_grad = True
+
+    elif transfer_mode == "full":
+        for param in model.encoder.parameters():
+            param.requires_grad = True
+
+    else:
+        raise ValueError("transfer_mode must be one of: 'strict', 'partial', 'full'")
+
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=LR)
+    optimizer = optim.Adam(
+        filter(lambda p: p.requires_grad, model.parameters()),
+        lr=LR
+    )
 
     train_loader, val_loader = get_loaders()
 
@@ -177,7 +257,7 @@ def train_segmenter():
             train_loss += loss.item()
 
             if i % 50 == 0:
-                print(f"[Seg][Epoch {epoch+1}] Batch {i}/{len(train_loader)} Loss: {loss.item():.4f}")
+                print(f"[Seg][{transfer_mode}][Epoch {epoch+1}] Batch {i}/{len(train_loader)} Loss: {loss.item():.4f}")
 
         # Validation
         model.eval()
@@ -196,18 +276,17 @@ def train_segmenter():
         train_loss /= len(train_loader)
         val_loss /= len(val_loader)
 
-        print(f"[Segmentation] Epoch {epoch+1} Train Loss: {train_loss:.4f} Val Loss: {val_loss:.4f}")
+        print(f"[Segmentation][{transfer_mode}] Epoch {epoch+1} Train Loss: {train_loss:.4f} Val Loss: {val_loss:.4f}")
 
         wandb.log({
-            "train_loss": train_loss,
-            "val_loss": val_loss
+            "train/loss": train_loss,
+            "val/loss": val_loss
         })
 
-    torch.save(model.state_dict(), "unet.pth")
+    torch.save(model.state_dict(), f"unet_{transfer_mode}.pth")
     wandb.finish()
 
 
+# ---------------------- MAIN ----------------------
 if __name__ == "__main__":
-    train_classifier()
-    train_localizer()
-    train_segmenter()
+    train_segmenter()  # run ONE at a time
