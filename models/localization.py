@@ -29,14 +29,14 @@ class VGG11Localizer(nn.Module):
         )
 
         self.bbox_head = nn.Linear(4096, 4)   # [x_center, y_center, w, h]
-        self.conf_head = nn.Linear(4096, 1)   # confidence logit
+        # self.conf_head = nn.Linear(4096, 1)   # confidence logit
 
     def forward(self, x: torch.Tensor):
         """Forward pass for localization model."""
         x = self.encoder(x)              # [B, 512, 7, 7]
         x = self.backbone_head(x)        # [B, 4096]
 
-        bbox = self.bbox_head(x)         # [B, 4]
-        confidence = torch.sigmoid(self.conf_head(x))  # [B, 1] in [0,1]
+        bbox = torch.sigmoid(self.bbox_head(x)) * 224.0         # [B, 4]
+        # confidence = torch.sigmoid(self.conf_head(x))  # [B, 1] in [0,1]
 
         return bbox

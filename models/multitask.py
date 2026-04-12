@@ -24,7 +24,7 @@ class MultiTaskPerceptionModel(nn.Module):
 
         # -------------------- DOWNLOAD FROM GDRIVE --------------------
         gdown.download(id="1D6VeI9pDCGZwq1o5PMPpb2Jnt8UaYRfo", output=classifier_path, quiet=False)
-        gdown.download(id="1Ihl1yNS1A1_xdUPsxCgeq0nm7viM3LoN", output=localizer_path, quiet=False)
+        gdown.download(id="1qoL49i2uVbHbRMc-U12Il0t9p3PSRqt_", output=localizer_path, quiet=False)
         gdown.download(id="1WxoqxzHZkonyoipE13c9ybuehsiapRCK", output=unet_path, quiet=False)
 
         # -------------------- INIT MODELS --------------------

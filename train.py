@@ -121,20 +121,19 @@ def train_classifier():
 def train_localizer():
     wandb.init(
         project="da6401",
-        name="localizer_base",
+        name="localizer_improved",
         config={
             "task": "localization",
             "lr": LR,
             "epochs": EPOCHS,
             "batch_size": BATCH_SIZE,
-            "loss": "MSE + IoU + BCE(confidence)"
+            "loss": "SmoothL1 + IoU"
         }
     )
 
     model = VGG11Localizer().to(DEVICE)
-    criterion_mse = nn.MSELoss()
+    criterion_reg = nn.SmoothL1Loss()
     criterion_iou = IoULoss()
-    criterion_conf = nn.BCELoss()
     optimizer = optim.Adam(model.parameters(), lr=LR)
 
     train_loader, val_loader = get_loaders()
@@ -171,7 +170,6 @@ def train_localizer():
         model.train()
         train_loss = 0
         train_iou = 0
-        train_conf = 0
 
         for i, batch in enumerate(train_loader):
             imgs = batch["image"].to(DEVICE)
@@ -179,22 +177,14 @@ def train_localizer():
 
             optimizer.zero_grad()
 
-            outputs = model(imgs)
-            pred_boxes = outputs["bbox"]
-            pred_conf = outputs["confidence"]
-
-            target_conf = torch.ones_like(pred_conf)
-
-            loss_bbox = criterion_mse(pred_boxes, boxes) + criterion_iou(pred_boxes, boxes)
-            loss_conf = criterion_conf(pred_conf, target_conf)
-            loss = loss_bbox + loss_conf
+            pred_boxes = model(imgs)
+            loss = criterion_reg(pred_boxes, boxes) + criterion_iou(pred_boxes, boxes)
 
             loss.backward()
             optimizer.step()
 
             train_loss += loss.item()
             train_iou += compute_iou(pred_boxes.detach(), boxes)
-            train_conf += pred_conf.mean().item()
 
             if i % 50 == 0:
                 print(f"[Localizer][Epoch {epoch+1}] Batch {i}/{len(train_loader)} Loss: {loss.item():.4f}")
@@ -202,51 +192,37 @@ def train_localizer():
         model.eval()
         val_loss = 0
         val_iou = 0
-        val_conf = 0
 
         with torch.no_grad():
             for batch in val_loader:
                 imgs = batch["image"].to(DEVICE)
                 boxes = batch["bbox"].to(DEVICE)
 
-                outputs = model(imgs)
-                pred_boxes = outputs["bbox"]
-                pred_conf = outputs["confidence"]
-
-                target_conf = torch.ones_like(pred_conf)
-
-                loss_bbox = criterion_mse(pred_boxes, boxes) + criterion_iou(pred_boxes, boxes)
-                loss_conf = criterion_conf(pred_conf, target_conf)
-                loss = loss_bbox + loss_conf
+                pred_boxes = model(imgs)
+                loss = criterion_reg(pred_boxes, boxes) + criterion_iou(pred_boxes, boxes)
 
                 val_loss += loss.item()
                 val_iou += compute_iou(pred_boxes, boxes)
-                val_conf += pred_conf.mean().item()
 
         train_loss /= len(train_loader)
         val_loss /= len(val_loader)
         train_iou /= len(train_loader)
         val_iou /= len(val_loader)
-        train_conf /= len(train_loader)
-        val_conf /= len(val_loader)
 
         print(
             f"[Localizer] Epoch {epoch+1} "
             f"Train Loss: {train_loss:.4f} Val Loss: {val_loss:.4f} "
-            f"Train IoU: {train_iou:.4f} Val IoU: {val_iou:.4f} "
-            f"Train Conf: {train_conf:.4f} Val Conf: {val_conf:.4f}"
+            f"Train IoU: {train_iou:.4f} Val IoU: {val_iou:.4f}"
         )
 
         wandb.log({
             "train/loss": train_loss,
             "val/loss": val_loss,
             "train/iou": train_iou,
-            "val/iou": val_iou,
-            "train/confidence": train_conf,
-            "val/confidence": val_conf
+            "val/iou": val_iou
         })
 
-    torch.save(model.state_dict(), "localizer_image.pth")
+    torch.save(model.state_dict(), "localizer_improved.pth")
     wandb.finish()
 
 
@@ -397,4 +373,4 @@ def train_segmenter():
 
 # ---------------------- MAIN ----------------------
 if __name__ == "__main__":
-    train_classifier()  # run ONE at a time
+    train_localizer()  # run ONE at a time
