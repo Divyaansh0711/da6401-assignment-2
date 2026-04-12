@@ -77,3 +77,19 @@ class VGG11Encoder(nn.Module):
         if return_features:
             return x, features
         return x
+    
+
+class VGG11(nn.Module):
+    """
+    Autograder-compatible VGG11 model.
+    Wraps VGG11Encoder.
+    """
+
+    def __init__(self, in_channels: int = 3):
+        super().__init__()
+
+        # IMPORTANT: default should work without needing extra args
+        self.encoder = VGG11Encoder(in_channels=in_channels, use_batchnorm=True)
+
+    def forward(self, x: torch.Tensor):
+        return self.encoder(x)

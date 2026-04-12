@@ -39,7 +39,4 @@ class VGG11Localizer(nn.Module):
         bbox = self.bbox_head(x)         # [B, 4]
         confidence = torch.sigmoid(self.conf_head(x))  # [B, 1] in [0,1]
 
-        return {
-            "bbox": bbox,
-            "confidence": confidence
-        }
+        return bbox

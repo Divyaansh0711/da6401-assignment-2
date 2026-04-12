@@ -53,6 +53,7 @@ class IoULoss(nn.Module):
 
         # IoU
         iou = inter_area / union
+        iou = iou.clamp(min=0.0, max=1.0)
 
         # Loss
         loss = 1 - iou

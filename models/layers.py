@@ -23,6 +23,7 @@ class CustomDropout(nn.Module):
         
         self.p = p
 
+    
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Forward pass for the CustomDropout layer.
@@ -35,6 +36,9 @@ class CustomDropout(nn.Module):
         """
         if not self.training or self.p == 0:
             return x
-        
-        mask = (torch.rand_like(x) > self.p).float()
+
+        if self.p == 1:
+            return torch.zeros_like(x)
+
+        mask = (torch.rand_like(x) > self.p).to(x.dtype)
         return (x * mask) / (1.0 - self.p)
