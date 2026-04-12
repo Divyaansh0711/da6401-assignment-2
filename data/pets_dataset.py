@@ -40,6 +40,10 @@ class OxfordPetsDataset(Dataset):
         image = image.resize((224, 224))
         image = torch.tensor(np.array(image)).permute(2, 0, 1).float() / 255.0
 
+        mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
+        std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
+        image = (image - mean) / std
+
         # ---- Mask ----
         mask_path = os.path.join(self.trimap_dir, name + ".png")
         mask = Image.open(mask_path)

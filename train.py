@@ -14,7 +14,7 @@ from data.pets_dataset import OxfordPetsDataset
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 BATCH_SIZE = 16
-EPOCHS = 5
+EPOCHS = 20
 LR = 1e-4
 
 
@@ -31,11 +31,11 @@ def get_loaders():
 # ---------------------- CLASSIFIER ----------------------
 def train_classifier():
     dropout_p = 0.2
-    use_batchnorm = False
+    use_batchnorm = True
 
     wandb.init(
         project="da6401",
-        name="classifier_bn_false",
+        name="classifier_imporoved",
         config={
             "task": "classification",
             "lr": LR,
@@ -113,7 +113,7 @@ def train_classifier():
             "val/accuracy": val_acc
         })
 
-    torch.save(model.state_dict(), f"classifier_bn_{use_batchnorm}.pth")
+    torch.save(model.state_dict(), f"classifier_improved.pth")
     wandb.finish()
 
 
@@ -397,4 +397,4 @@ def train_segmenter():
 
 # ---------------------- MAIN ----------------------
 if __name__ == "__main__":
-    train_localizer()  # run ONE at a time
+    train_classifier()  # run ONE at a time
