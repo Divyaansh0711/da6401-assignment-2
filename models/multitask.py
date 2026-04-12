@@ -52,7 +52,7 @@ class MultiTaskPerceptionModel(nn.Module):
         mask = torch.argmax(seg_out, dim=1)       # [B, H, W]
 
         return {
-            "label": label,
-            "bbox": bbox,
-            "mask": mask,
+            "classification": cls_out,
+            "localization": bbox,
+            "segmentation": seg_out,
         }
